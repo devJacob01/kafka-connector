@@ -487,7 +487,7 @@ curl -X DELETE http://169.56.84.35:30432/consumers/cg-tb_user-01/instances/cg-tb
 ```
    
       
-## 결언     
+# 결언     
 
 지금까지 kafka-connector와 kafka-rest-proxy를 통해 data를 연계하는 방법을 알아 보았다.  kafka-connector 는 database에서 데이터 변경시 손쉽게 kafka topic으로 메시지를 보낼 수 있는 매우 강력한 연계 모듈이다.  connector 설정을 통해 다양한 data source로 부터 손쉽게 topic에 데이터를 연계할 수 있다.   
 보다 상세한 내용은 [confluent-connector](https://docs.confluent.io/home/connect/overview.html) 사이트를 통해 알아보자.  
