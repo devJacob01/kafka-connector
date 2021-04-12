@@ -27,7 +27,7 @@ kafka connector를 이용하여 mariadb cdc를 구현하는 방법을 소개합�
 ```
 git clone git@github.com:confluentinc/cp-helm-charts.git
 ```
-다운로드 받은 디렉토리롤 이동한다.
+다운로드 받은 디렉토리로 이동한다.
 ```
 cd cp-helm-charts
 ```
@@ -68,7 +68,7 @@ confluent-cp-zookeeper-headless   ClusterIP   None             <none>        288
 ```
 
 ### 2. kafka connector 설치 
-kafka connector는 mariadb에서 cdc 연계를 하기 위한 모듈인다.   
+kafka connector는 mariadb에서 cdc 연계를 하기 위한 모듈이다.   
 설치 스크립트를 실행한다.
 ```
 helm install confluent-2 \
@@ -83,7 +83,7 @@ helm delete confluent-2
 ```
 
 ### 3. kafka rest proxy 설치
-kafka rest proxy는 topic을 rest api를 통해서 consumergroup을 등록하고 subscribe 설정 및 데이터를 읽도록 하는 rest api를 제공하는 모듈이다.
+kafka rest proxy는 topic에 등록된 메시지를 rest api를 통해서 조작하도록 기능을 제공하는 모듈이다. consumergroup을 등록하고 subscribe 설정 및 데이터를 읽는 작업을 수행할 수 있다. 
 ```
 helm install cp-kafka-rest \
   --set cp-kafka.bootstrapServers="PLAINTEXT://confluent-cp-kafka-headless:9092" \
@@ -276,8 +276,8 @@ spec:
             name: mariadb-config
 ```
 configmap.yaml을 생성한다.   
-kafka-connector랑 연똥하기 위해서는 log-bin 설정이 되어야 한다. 
-bin log의 유효기간 7일은 설정목적에 따라 적절한 값으로 설정하면 된다.    
+kafka-connector랑 연동하기 위해서는 log-bin 설정이 되어야 한다. 
+bin log의 유효기간 7일은 목적에 따라 적절한 값으로 변경하면 된다.    
 ```
 apiVersion: v1
 kind: ConfigMap
@@ -298,16 +298,19 @@ data:
 mariadb에서 값이 변경된 것을 kafka topic으로 연계하기 위해서는 kakfa-connector를 설정해 주어야 한다.  
 다음과 같은 순서로 진행한다. 
 
-1. mariadb, table 생성
+1. database, table 생성
 2. kafka-connector 생성 
 
 ### 1. database, table 생성  
+database 및 계정을 생성한다.
+생성된 계정에 권한을 할당한다.  
 ```
 create database msadb default CHARACTER SET utf8 collate utf8_unicode_ci;
 create user 'msa'@'%' IDENTIFIED by 'passw0rd';
 grant all PRIVILEGES on msadb.* to 'msa'@'%';
 ```
 sample 테이블을 생성한다.  
+데이타가 추가된 것을 감지하기 위한 ```id``` 항목과 데이터 변경된 데이터를 인지하기 위한 ```updated``` 컬럼은 반드시 필요하다.  
 ```
 CREATE TABLE `tb_user` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
@@ -323,13 +326,7 @@ CREATE TABLE `tb_user` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci
 ```
 ### 2. kafka-connector 생성
-
-name의 경우 생성하고자 하는 connector의 이름이다.   
-connection.url에 생성한 dabase 정보를 입력한다.  
-mode의 경우 데이터의 생성/변경 등의 설정값을 세팅할 수 있다. 현재는 신규와 변경 2 정보에 대해 변화를 감지하도록 설정하였다.    
-incrementing.column.name의 경우 row가 증가할 경우 확인할 컬럼을 넣는다. 여기서는 'id'값으로 한다.
-timestamp.column.name의 경우  데이터의 변경이 생기는 컬럼 항목을 넣는다. 여기서는 'updated' 컬럼으로 지정하였다.   
-topic-prefix의 경우 kafka topic이 생성될때 접두어로 사용될 값을 입력한다.   
+ 
 
 connection을 생성하기 위해서는 kafka-connector pod 안에서 명령을 수행해야 한다.  
 kubectl get pod로 설치된 pod명을 확인하다. 
@@ -337,12 +334,20 @@ kubectl get pod로 설치된 pod명을 확인하다.
 NAME                                            READY   STATUS              RESTARTS   AGE
 confluent-2-cp-kafka-connect-67c75f65c6-qw76f   2/2     Running             0          4d11h
 ```
-등록된 pod명을 넣고 다음 명령을 수행한다.  
+등록된 pod명을 넣고 다음 명령을 수행한다. pod명만 확인된 값으로 수정하고 실행하자.
 ```
 kubectl exec -ti confluent-2-cp-kafka-connect-67c75f65c6-qw76f \
   --container cp-kafka-connect-server -- /bin/bash
 ```
-pod 안에서 다음 명령을 수행하여 connector를 등록한다.
+pod 안에서 다음 명령을 수행하여 connector를 등록한다.   
+
+```name```의 경우 생성하고자 하는 connector의 이름이다.   
+```connection.url```에 생성한 database 정보를 입력한다.  
+```mode```의 경우 데이터의 생성/변경 등의 설정값을 세팅할 수 있다. 현재는 신규와 변경 2 정보에 대해 변화를 감지하도록 설정하였다.    
+```incrementing.column.name```의 경우 row가 증가할 경우 확인할 컬럼을 넣는다. 여기서는 'id'값으로 한다.
+```timestamp.column.name```의 경우  데이터의 변경이 생기는 컬럼 항목을 넣는다. 여기서는 'updated' 컬럼으로 지정하였다.   
+```topic-prefix```의 경우 kafka topic이 생성될 때 접두어로 사용될 값을 입력한다.  
+
 ```
 curl -X POST \
   -H "Content-Type: application/json" \
@@ -368,7 +373,7 @@ curl -X POST \
 curl -s -X \
   GET http://localhost:8083/connectors/k8s-connect-source/status
 ```
-상태가 'RUNNING' 이어야 동작한다.  
+상태가 'RUNNING' 이어야 정상적으로 동작한다.  
 ```json
 {"name":"k8s-connect-source","connector":{"state":"RUNNING","worker_id":"192.168.229.190:8083"},"tasks":[{"id":0,"state":"RUNNING","worker_id":"192.168.229.190:8083"}],"type":"source"}
 ```
@@ -387,7 +392,7 @@ kafka-client를 통해서 topic을 생성한다.
 ```
 kubectl -n lab99 exec kafka-client -- /usr/bin/kafka-topics --zookeeper confluent-cp-zookeeper:2181 --list
 ```
-아래와 같은 목록인 출력된다.   
+아래와 같은 목록이 출력된다.   
 ```
 __consumer_offsets
 _confluent-metrics
@@ -395,14 +400,12 @@ confluent-2-cp-kafka-connect-config
 confluent-2-cp-kafka-connect-offset
 confluent-2-cp-kafka-connect-status
 ```
+확인하고자 하는 t 명을 선택하여 아래 명령을 수정하고 실행한다.
+```
+kubectl -n lab99 exec kafka-client -- /usr/bin/kafka-topics --zookeeper confluent-cp-zookeeper:2181 --list
+```
 
-```
-kubectl -n lab99 exec -ti \
-    kafka-client -- /usr/bin/kafka-console-consumer \
-    --bootstrap-server confluent-cp-kafka-headless:9092 \
-    --topic k8s-connect-user05-tb_user --from-beginning
-```
-tb_user테이블이 k8s-connect-tb_user라 명으로 새로운 topic이 생성되었다.   
+tb_user테이블이 k8s-connect-tb_user라 명으로 새로운 topic이 생성 되었다.   
 ```
 __consumer_offsets
 _confluent-metrics
@@ -412,25 +415,37 @@ confluent-2-cp-kafka-connect-status
 k8s-connect-tb_user
 ```
 
+생성된 토픽에 대해 메시지를 확인하기 위한 명령이다. 위에서 생성된 토픽명을 인자값으로 수정하여 다음 명령을 수행한다.  
+```
+kubectl -n lab99 exec -ti \
+    kafka-client -- /usr/bin/kafka-console-consumer \
+    --bootstrap-server confluent-cp-kafka-headless:9092 \
+    --topic k8s-connect-user05-tb_user --from-beginning
+```
+
+table에 값이 입력되면 데이터가 자동으로 topic에 전달되고 topic에 저장된 항목이 콘솔애 출력된다. 
+```json
+{"id":15,"user_id":"han3","user_nm":"test","addr":"dd","cell_phone":"0102223333","agree_info":"aa","birth_dt":"dd","updated":1617858547000}
+```
 
 ## consumer group 관리하기  
-topic으로 부터 데아터를 읽기위해서는 해당 topic을 consumer gruop으로 등록해야 한다. 
+topic으로 부터 데아터를 읽기 위해서는 해당 topic을 consumer gruop으로 등록해야 한다. 
 ### 1. consumer group 등록
-kubectl get svc에서 NodePort 정보를 확인한다.
+```kubectl get svc```에서 NodePort 정보를 확인한다.
 ```
 NAME                              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                         AGE
 cp-kafka-rest                     NodePort    10.104.33.80     <none>        8082:30432/TCP,5556:30985/TCP   4d21h
 ```
-kubectl get node -o wide 로 cluster 고정IP정보를 확인한다.
-보통 external IP인데, 여기서는 internal-ip가 외부에서 접속 가능한 고정 IP이다. 클러스터 마다 정보가 다르므로 확인한다.  
+```kubectl get node -o wide``` 로 cluster 고정IP 정보를 확인한다.
+보통 external IP인데, 여기서는 internal-ip가 외부에서 접속 가능한 고정 IP로 등록이 되었다. 클러스터 마다 정보가 다르므로 이를 확인한다.  
 ```
 NAME                STATUS   ROLES                  AGE    VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE         KERNEL-VERSION                 CONTAINER-RUNTIME
 k8s2.msa.ibm.com   Ready    control-plane,master   20d    v1.20.5   169.56.84.35    <none>        CentOS Linux 8   4.18.0-193.14.2.el8_2.x86_64   docker://20.10.5
 ```
-외부 접속 IP와 Port정보를 확인하였으면 이 정보로 다음의 명령을 수행한다.   
+외부 접속 IP와 Port정보를 확인 하였으면 이 정보로 다음의 명령을 수행한다.   
 로컬 PC 또는 명령을 수행하는 PC에 curl이 설치되어 있어야 한다.  
-name에는 등록할 컨슈머 그룹 인스턴스명을 적는다. 
-등록할 url 정보에 컨슈머 그룹을 적는다. 여기서는 cg-tb_user-01로 명명 하였다. 
+```name```에는 등록할 컨슈머 그룹 인스턴스명을 적는다. 
+등록할 ```url``` 정보에 컨슈머 그룹을 적는다. 여기서는 cg-tb_user-01로 명명 하였다. 
 ```
 curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" \
       --data '{"name": "cg-tb_user-01-instance", "format": "json", "auto.offset.reset": "earliest"}' \
@@ -442,8 +457,12 @@ curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" \
 ```
 ### 2. consumer 구독하기
 1번에서 등록한 consumer group의 결과로 리턴받은 base_url을 이용하여 topic구독을 설정한다.  
-~/consumners/ 이하에서 사용할 url 은 리턴받은 base_url값을 사용한다.   
-구독하고 싶은 topic을 topics 항목에 기입힌다.
+~/consumners/ 다음 항목으로 사용할 url은 리턴받은 base_url값을 적어준다.
+구독하고 싶은 topic을 topics 항목에 기입힌다.   
+```
+주의) 
+리턴 받은 base_url의 경우 내부IP(Private IP)를 사용한 주소이므로 위에서 확인한 내부접속 가능한 정보를 사용하여야 한다.
+```
 
 ```
 curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" --data '{"topics":["k8s-connect-tb_user"]}' \
@@ -470,7 +489,7 @@ curl -X DELETE http://169.56.84.35:30432/consumers/cg-tb_user-01/instances/cg-tb
       
 ## 결언     
 
-지금까지 kafak-connector와 kafka-rest-proxy를 통해 data를 연계하는 방법을 알아 보았다.  kafka-connector 는 database에서 데이터 변경시 손쉽게 kafka topic에 메시지를 보낼 수 있는 매우 강력한 연계 모듈이다.  connector 설정을 통해 다양한 data source로 부터 손쉽게 topic에 데이터를 연계할 수 있다.   
+지금까지 kafka-connector와 kafka-rest-proxy를 통해 data를 연계하는 방법을 알아 보았다.  kafka-connector 는 database에서 데이터 변경시 손쉽게 kafka topic으로 메시지를 보낼 수 있는 매우 강력한 연계 모듈이다.  connector 설정을 통해 다양한 data source로 부터 손쉽게 topic에 데이터를 연계할 수 있다.   
 보다 상세한 내용은 [confluent-connector](https://docs.confluent.io/home/connect/overview.html) 사이트를 통해 알아보자.  
 
 ## [참고] 유용한 명령 모음   
@@ -478,7 +497,7 @@ curl -X DELETE http://169.56.84.35:30432/consumers/cg-tb_user-01/instances/cg-tb
 ### kafka-connector
 #### connector log
 kakfa-connector의 로그를 통해  connector가 잘 동작하는지 모니터링을 할 수 있다.  로그를 확인하기 위해서는 구동하는  pod정보를 먼저 확인해야 한다.  
-kubectl get pod 명령을 통해 실행되는 pod 정보를 확인하자.
+```kubectl get pod ```명령을 통해 실행되는 pod 정보를 확인하자.
 ```
 NAME                                            READY   STATUS              RESTARTS   AGE
 confluent-2-cp-kafka-connect-67c75f65c6-qw76f   2/2     Running             0          4d15h
