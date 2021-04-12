@@ -11,8 +11,8 @@ kafka connector를 이용하여 mariadb cdc를 구현하는 방법을 소개합�
 - mysqldb
 
 # sample application
-- api server : springboot로 개발
-- sync agent : nodejs 로 개발
+- [api server : springboot로 개발](https://github.com/devJacob01/mvp-sample-springboot)
+- [sync agent : nodejs 로 개발](https://github.com/devJacob01/nodejs-mysql-agent)   
 
 
 
